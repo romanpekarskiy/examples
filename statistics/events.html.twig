@@ -1,0 +1,430 @@
+{% block body %}
+    <div class="row">
+        <form class="form-inline" style="position: relative">
+            <div class="form-group col-md-12">
+                <div id="datepicker" style="text-align: center; zoom: 0.8;"></div>
+            </div>
+        </form>
+    </div>
+    <div class="row">
+        <div class="col-md-12">
+            <select data-placeholder="Группы не выбраны" multiple class="chosen-select" id="groups">
+                {% for group in groups %}
+                    <option value="{{ group.id }}">{{ group.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <hr>
+    <div class="row" id="statistics-widgets"></div>
+
+
+    <script type="text/template" id="template-statistics-widget">
+        <hr>
+        <label> <%= label %> </label>
+        <span class="viewElement"></span>
+    </script>
+
+    <script type="text/template" id="template-statistics-widget-scalar">
+        <hr>
+        <label> <%= label %> </label>
+        <span class="viewElement" style="float: right"></span>
+    </script>
+
+    <script type="text/template" id="template-statistics-widget-chart">
+        <hr>
+        <label> <%= label %> </label>
+        <div class="viewElement" style="padding-top: 20px"></div>
+    </script>
+{% endblock %}
+
+{% block postbodyscripts %}
+    <link href="{{ asset('admin/chosen.min.css') }}" rel="stylesheet"/>
+    <script src="{{ asset('js/bluebird.min.js') }}"></script>
+    <script src="{{ asset('admin/js/pickmeup.min.js') }}"></script>
+    <script src="{{ asset('admin/js/pickmeup.locale-ru.js') }}"></script>
+    <script src="{{ asset('admin/js/jquery.pickmeup.twitter-bootstrap.js') }}"></script>
+    <script src="{{ asset('admin/chosen.jquery.min.js') }}"></script>
+    <script src="{{ asset('admin/js/Chart.bundle.2.5.0.js') }}"></script>
+    <script src="{{ asset('admin/js/underscore-min.js') }}"></script>
+    <script src="{{ asset('admin/js/backbone-min.js') }}"></script>
+    <script src="{{ asset('admin/js/statistics/methods.js') }}"></script>
+    <script src="{{ asset('admin/js/statistics/widget.js') }}"></script>
+    <script src="{{ asset('admin/js/statistics/container.js') }}"></script>
+    <script src="{{ asset('admin/js/statistics/view.scalar.js') }}"></script>
+    <script src="{{ asset('admin/js/statistics/view.chart.js') }}"></script>
+    <script>
+        Promise.config({cancellation: true});
+        $('.chosen-select').chosen();
+        var currentDate = new Date();
+        var currentMonth = new Date(0);
+        currentMonth.setFullYear(currentDate.getFullYear());
+        currentMonth.setMonth(currentDate.getMonth());
+
+        var nextMonth = new Date(currentMonth);
+        nextMonth.setMonth(nextMonth.getMonth()+1);
+        nextMonth.setDate(0);
+
+        var oldGroups = [];
+
+        $('.chosen-select').change( function () {
+            var groups = $('.chosen-select').val() || [];
+
+            groups = groups.map(function (option) {
+                return parseInt(option);
+            });
+
+            if(groups == oldGroups) return;
+
+            oldGroups = groups;
+
+            var timeout = 0;
+            _.each(widgetsContainer.childWidgets,function (widget) {
+                // fake lazy
+                setTimeout(function () {
+                    widget.inputData.set('groups', groups);
+                    widget.update();
+                }, timeout);
+                timeout += 100;
+            });
+        });
+
+        var datepicker = document.querySelector("#datepicker");
+
+        pickmeup(datepicker, {
+            mode: 'range',
+            format: 'Y-m-d',
+            locale: "ru",
+            select_month: false,
+            select_year: false,
+            flat: true,
+            date: [
+                currentMonth,
+                nextMonth
+            ],
+            hide_on_select: true,
+            calendars: 6
+        });
+
+        $('#datepicker').pickmeup_twitter_bootstrap();
+
+        function StatisticsUpdateTime(forced) {
+            var dates = pickmeup(datepicker).get_date();
+            var startDate = dates[0];
+            var endDate = dates[1];
+
+            startDate = new Date(startDate.getTime() - startDate.getTimezoneOffset()*60000);
+            endDate = new Date(endDate.getTime() - endDate.getTimezoneOffset()*60000);
+            endDate.setUTCDate(endDate.getUTCDate()+1);
+
+            var range = new Date(endDate - startDate);
+            var period = 'month';
+
+            if( (range.getDate() + range.getMonth()*30) < 31*3 ){
+                period = 'day';
+            }
+
+            if( (range.getDate() + range.getMonth()*30) <= 15 ){
+                period = 'hour';
+            }
+
+            var timeout = 0;
+            _.each(widgetsContainer.childWidgets,function (widget) {
+                // fake lazy
+                setTimeout(function () {
+                    widget.inputData.set('startDate', startDate);
+                    widget.inputData.set('endDate', endDate);
+                    widget.inputData.set('period', period);
+                    widget.update(forced);
+                }, timeout);
+                timeout += 100;
+            });
+        }
+
+        datepicker.addEventListener('pickmeup-fill', function () {
+            StatisticsUpdateTime();
+        });
+
+        var widgetsContainer = new StatisticsWidgetsContainer({
+            widgets: [
+                {
+                    method: statisticsMethods.getFirstLaunches,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Первые запуски"
+                    }
+                },
+                {
+                    method: statisticsMethods.getUniquesLaunches,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Запуски (уники)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getSpecialOfferViewers,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Увидели оффер"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentsAmount,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Заплатили итого (руб)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentsUniques,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Заплатили итого чел"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentViewers,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Увидели форму оплаты"
+                    }
+                },
+                {
+                    method: statisticsMethods.getFirstPaymentsAmount,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Заплатили впервые (руб)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getFirstPaymentsUniques,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Заплатили впервые чел"
+                    }
+                },
+//                {
+//                    method: statisticsMethods.getPaymentFailure,
+//                    viewType: StatisticsScalarView,
+//                    template: $('#template-statistics-widget-scalar'),
+//                    templateData: {
+//                        label: "Попытались оплатить"
+//                    }
+//                },
+                {
+                    method: statisticsMethods.getWatchedMoreThan2Hours,
+                    viewType: StatisticsScalarView,
+                    template: $('#template-statistics-widget-scalar'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Смотрели более 2 часов"
+                    }
+                },
+                {
+                    method: statisticsMethods.getFirstLaunchesOnPeriod,
+                    viewType: StatisticsChartView,
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Первые запуски"
+                    }
+                },
+                {
+                    method: statisticsMethods.getLaunchesOnPeriod,
+                    viewType: StatisticsChartView,
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Запуски"
+                    }
+                },
+                {
+                    method: statisticsMethods.getFirstPaymentsOnPeriod,
+                    viewType: StatisticsChartView,
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Первые оплаты (транзакции)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getFirstPaymentsAmountOnPeriod,
+                    viewType: StatisticsChartView,
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Первые оплаты (в рублях)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentViewersOnPeriod,
+                    viewType: StatisticsChartView,
+                    className: 'col-md-4 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Просмотров формы оплаты"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentsAmountOnPeriod,
+                    viewType: StatisticsChartView,
+                    template: $('#template-statistics-widget-chart'),
+                    className: 'col-md-4 statistics-widget',
+                    templateData: {
+                        label: "Оплаты (в рублях)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getPaymentsOnPeriod,
+                    viewType: StatisticsChartView,
+                    className: 'col-md-4 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Оплаты (транзакции)"
+                    }
+                },
+//                {
+//                    method: function (parameters) {
+//                        var paymentsAmount = widgetsContainer.childWidgets[_.findIndex(widgetsContainer.config.widgets, {method:statisticsMethods.getPaymentsAmountOnPeriod})];
+//                        var paymentsCount = widgetsContainer.childWidgets[_.findIndex(widgetsContainer.config.widgets, {method:statisticsMethods.getPaymentsOnPeriod})];
+//
+//                        return Promise.all([
+//                            new Promise(function (resolve) {
+//                                paymentsAmount.on('ready', resolve)
+//                            }),
+//
+//                            new Promise(function (resolve) {
+//                                paymentsCount.on('ready', resolve)
+//                            })
+//                        ]).spread(function (amountResults, countResults) {
+//                            return amountResults.map(function (item, index) {
+//                                var count = 0;
+//                                if(countResults[index].count != 0){
+//                                    count = item.count / countResults[index].count
+//                                }
+//                                return {
+//                                    count: count,
+//                                    time: item.time
+//                                }
+//                            });
+//                        })
+//                    },
+//                    viewType: StatisticsChartView,
+//                    className: 'col-md-4 statistics-widget',
+//                    template: $('#template-statistics-widget-chart'),
+//                    templateData: {
+//                        label: "Средняя оплата (в рублях)"
+//                    }
+//                },
+                {
+                    method: statisticsMethods.getWatchedHoursOnPeriod,
+                    viewType: StatisticsChartView,
+                    className: 'col-md-4 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Просмотрено часов"
+                    }
+                },
+                {
+                    method: statisticsMethods.getChannelBlockedOnPeriod,
+                    viewType: StatisticsChartView,
+                    className: 'col-md-4 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Блокировок каналов"
+                    }
+                },
+                {
+                    method: statisticsMethods.getChannelStalledOnPeriod,
+                    viewType: StatisticsChartView,
+                    className: 'col-md-4 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Подвисаний каналов"
+                    }
+                },
+                {
+                    method: statisticsMethods.getCDNVIDEOBandwidth,
+                    viewType: StatisticsChartView,
+                    viewTypeOptions: {
+                      useParseInt: false
+                    },
+                    className: 'col-md-6 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Канал на cdnvideo (ГБит/с)"
+                    }
+                },
+                {
+                    method: statisticsMethods.getCDNNOWTraffic,
+                    viewType: StatisticsChartView,
+                    viewTypeOptions: {
+                        useParseInt: false
+                    },
+                    className: 'col-md-6 statistics-widget',
+                    template: $('#template-statistics-widget-chart'),
+                    templateData: {
+                        label: "Трафик на cdnnow (ТБайт)"
+                    }
+                }
+            ]
+        });
+
+        StatisticsUpdateTime(true);
+
+        $('#statistics-widgets').append(widgetsContainer.$el);
+    </script>
+
+    <style>
+        .chosen-container{
+            width: 100% !important;
+        }
+        .small-refresh-btn{
+            padding: 0 5px;
+            cursor: pointer;
+            opacity: 0.2;
+        }
+        .small-refresh-btn:hover{
+            opacity: 1;
+        }
+        .search-choice{
+            background: #5BC0DE !important;
+            border: none !important;
+            color: white !important;
+            font-size: 15px;
+            padding: 5px 20px 5px 7px !important;
+        }
+        .search-choice-close{
+            top: 6px !important;
+            right: 5px !important;
+        }
+        .chosen-choices{
+            background: none !important;
+            border-radius: 3px !important;
+            padding: 5px 9px !important;
+        }
+        .chosen-results .active-result.highlighted{
+            background: #5BC0DE !important;
+        }
+        .pmu-not-in-month{
+            visibility: hidden !important;
+        }
+        /*canvas {*/
+        /*}*/
+        .statistics-widget{
+            transition: opacity 0.5s;
+        }
+    </style>
+{% endblock %}

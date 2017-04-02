@@ -1,0 +1,227 @@
+{% block body %}
+    <div class="device-events-config">
+        <div>
+            <form class="form-inline">
+                <input type='date' id="startDate" class="form-control"/><label>&nbsp—&nbsp</label><input type='date' id="endDate" class="form-control"/>
+                <div class="btn btn-info" onclick="loadEvents()">Загрузить</div>
+                <div class="btn btn-info" onclick="loadRecentEvents()">Загрузить самые свежие</div>
+            </form>
+        </div>
+        <div id="device-events-filter"></div>
+    </div>
+    <div id="device-events" class="device-events"></div>
+{% endblock %}
+
+{% block headscripts %}
+    <link href="{{ asset('admin/css/device-events.css') }}" rel="stylesheet"/>
+
+    <script type="text/template" id="newDayTemplate">
+        <%
+        var months = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+        var day = date.getUTCDate();
+        var month = months[date.getUTCMonth()];
+        var year = date.getUTCFullYear();
+        %>
+        <div class="newDay">
+            <div class="time">
+                <%= day %> <%= month %> <%= year %>
+            </div>
+        </div>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-default">
+        <div class="icon"></div>
+        <div class="info">
+            <div class="event-heading">Событие</div>
+            <em> <%= data.type %> </em>
+        </div>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-json">
+        <pre><% print(JSON.stringify(data,0,4)) %></pre>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-APP_START">
+        <div class="info">
+            <div class="event-heading">Запуск приложения</div>
+        </div>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-PAYMENT_SUCCESS">
+        <%
+        var amount = '';
+        try {
+            amount = data.attributes.amount
+        } catch(e){}
+
+        var auto = '';
+        try {
+            auto = data.attributes.auto;
+            if(auto){
+                auto = '(АВТО)'
+            }
+        } catch(e){}
+
+        var service = '';
+        try {
+            service = data.attributes.service;
+        } catch(e){}
+
+        var transaction_id = '';
+        try {
+            transaction_id = data.attributes.transaction_id;
+        } catch(e){}
+
+        %>
+        <div class="info">
+            <div class="event-heading">Транзакция <%= amount %> р. <%= auto %></div>
+            через <%= service %> (<%= transaction_id %>)
+        </div>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-BROADCAST_START">
+        <%
+            var broadcastName = '';
+            try {
+                broadcastName = data.attributes.title;
+                if(data.attributes.subtitle) {
+                    broadcastName += '; ' + data.attributes.subtitle
+                }
+            } catch(e){}
+
+            var channelName = '';
+            try {
+            channelName = data.channel_name;
+            } catch(e){}
+        %>
+        <div class="info">
+            <div class="event-heading">Запуск передачи</div>
+            <%= channelName %></br>
+            <%= broadcastName %>
+        </div>
+    </script>
+
+    <script type="text/template" id="eventDataTemplate-BROADCAST_WATCH">
+        <%
+        var percent = 0;
+        try {
+            percent = data.attributes.percent*100;
+        } catch(e){}
+
+        var duration = 0;
+        try {
+            duration = data.attributes.duration*1000;
+        } catch(e){}
+
+        var watchedTimeString = new Date(duration).toISOString().slice(11,19);
+
+        var broadcastName = '';
+        try {
+            broadcastName = data.attributes.title;
+            if(data.attributes.subtitle) {
+                broadcastName += '; ' + data.attributes.subtitle
+            }
+        } catch(e){}
+
+        var channelName = '';
+        try {
+            channelName = data.channel_name;
+        } catch(e){}
+        %>
+        <div class="info">
+            <div class="event-heading">Просмотр</div>
+            <%= channelName %></br>
+            <%= broadcastName %>
+            <div class="watch-progressbar"><div class="watch-progress" style="width: <%= percent %>%"><%= watchedTimeString %></div></div>
+        </div>
+    </script>
+
+    <script type="text/template" id="eventTemplate">
+        <div class="event-time">
+            <%= time %>
+        </div>
+        <div class="event-data <% if (right){ print('right') } %>">
+        </div>
+    </script>
+
+    <script type="text/javascript" src="{{ asset('admin/js/underscore.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('admin/js/backbone.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('admin/js/device-events.js') }}"></script>
+    <script type="text/javascript" src="{{ asset('admin/js/device-events-filter.js') }}"></script>
+    <script type="text/javascript">
+        // get device ID
+        var deviceID = '{{ device.uniqueID }}';
+
+        function loadEvents() {
+            var startDate = new Date(startDateInput.val());
+            startDate.setUTCHours(startDate.getUTCHours() + 3);
+            startDate.setMinutes(0);
+            startDate.setSeconds(0);
+            startDate.setMilliseconds(0);
+
+            var endDate = new Date(endDateInput.val());
+            endDate.setUTCHours(endDate.getUTCHours() + 3);
+            endDate.setMinutes(0);
+            endDate.setSeconds(0);
+            endDate.setMilliseconds(0);
+
+            deviceEventsView.reset();
+
+            deviceEventsView.setDate({
+                startDate: startDate.getTime(),
+                endDate: endDate.getTime()
+            });
+
+            deviceEventsView.load();
+        }
+        function loadRecentEvents() {
+            var startDate = new Date();
+            startDate.setUTCHours(startDate.getUTCHours() + 3);
+
+            var endDate = new Date(startDate);
+            endDate.setUTCHours(endDate.getUTCHours() + 3);
+
+            startDate.setDate(startDate.getDate()-7);
+
+            deviceEventsView.reset();
+
+            deviceEventsView.setDate({
+                startDate: startDate.getTime(),
+                endDate: endDate.getTime()
+            });
+
+            deviceEventsView.load();
+        }
+
+        // prepare dates
+        var startDateInput = $('.device-events-config #startDate');
+        var endDateInput = $('.device-events-config #endDate');
+
+        var currentMonth = new Date();
+        var lastMonth = new Date();
+
+        lastMonth.setMonth(lastMonth.getMonth()-1);
+
+        startDateInput.val(lastMonth.toISOString().substr(0,10));
+        endDateInput.val(currentMonth.toISOString().substr(0,10));
+
+
+        // add device events widget
+        var deviceEventsView = new DeviceEventsView({deviceId:deviceID});
+        var deviceEventFiltersView = new DeviceEventFiltersView();
+
+        // add filtering widget with autofilling by events
+        deviceEventFiltersView.on('filter', function(types){
+            deviceEventsView.filter(types);
+        });
+        deviceEventsView.deviceEvents.on('add', function (event) {
+            deviceEventFiltersView.deviceEventFilters.tryToAddType(event)
+        });
+
+        $('#device-events-filter').append(deviceEventFiltersView.el);
+        $('#device-events').append(deviceEventsView.el)
+
+        loadEvents();
+    </script>
+{% endblock %}

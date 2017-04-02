@@ -1,0 +1,140 @@
+@import "normalize.css";
+* {
+  padding: 0;
+  margin: 0;
+  user-select: none;
+}
+.inventory-window {
+  display: block;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  line-height: 0px;
+}
+.items-list {
+  position: absolute;
+  left: 370px;
+  top: 40px;
+  width: 220px;
+}
+.items-list:before {
+  content: 'все предметы';
+  display: block;
+  position: absolute;
+  top: -20px;
+}
+.items-list .item-collection {
+  position: relative;
+  margin: 2px;
+  display: inline-block;
+}
+.items-list .item-collection:hover:after {
+  top: 0px;
+  left: 100%;
+}
+.inventory {
+  width: 224px;
+  position: absolute;
+  left: 100px;
+}
+.equipment {
+  position: absolute;
+  left: 0px;
+}
+.equipment em {
+  display: block;
+  margin-bottom: -2px;
+  line-height: 1;
+  margin-top: 7px;
+}
+.inventory-slot {
+  display: inline-block;
+  position: relative;
+  width: 50px;
+  height: 50px;
+  margin: 3px;
+  background: whitesmoke;
+  outline: 1px solid grey;
+}
+.item-collection {
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  background: black;
+}
+.item-collection:hover:after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 0px;
+  background: #ffffff;
+  outline: 1px solid black;
+  padding: 10px;
+  line-height: 1;
+  top: 100%;
+  z-index: 100;
+  display: block;
+  pointer-events: none;
+}
+.item-collection.quest {
+  outline: 5px solid goldenrod;
+}
+.item-collection.quest .item-counter {
+  color: goldenrod;
+}
+.item-collection .item-icon {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+}
+.item-collection .item-counter {
+  position: absolute;
+  bottom: 9px;
+  right: 3px;
+  color: white;
+  font-size: 16px;
+  text-shadow: -1px 1px 1px black;
+  opacity: 1;
+}
+.item-collection .item-counter.hidden {
+  opacity: 0;
+}
+.context-menu {
+  position: absolute;
+  background: #808080;
+  outline: 1px solid black;
+  box-shadow: 0px 0px 30px -3px black;
+}
+.context-menu span {
+  display: block;
+  padding: 8px;
+}
+.context-menu span em {
+  display: inline;
+  font-style: italic;
+  margin-left: 20px;
+}
+.context-menu span:hover {
+  cursor: pointer;
+  background: rgba(202, 255, 0, 0.68);
+}
+.buttons {
+  position: absolute;
+  top: 230px;
+  left: 100px;
+  width: 220px;
+}
+.buttons button {
+  display: inline-block;
+}
+.readme {
+  position: absolute;
+  top: 270px;
+  padding: 50px;
+  font-family: monospace;
+  white-space: pre-line;
+  user-select: initial;
+  font-size: 16px;
+}
+.readme * {
+  user-select: initial;
+}
